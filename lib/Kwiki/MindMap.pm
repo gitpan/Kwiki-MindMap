@@ -26,7 +26,7 @@ use warnings;
 use Kwiki::Plugin '-Base';
 use YAML;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 const class_id => 'mindmap';
 const class_title => 'MindMap Blocks';
@@ -42,8 +42,12 @@ use base 'Spoon::Formatter::WaflBlock';
 use Digest::MD5;
 use GraphViz;
 
+field fontsize => 12;
+field fontname => 'Times';
+
 sub to_html {
     $self->cleanup;
+    $self->read_pageconf;
     $self->render_mindmap($self->units->[0]);
 }
 
@@ -57,6 +61,14 @@ sub cleanup {
     for(<$path/$page_id/*.png>) {
 	my $mt = (stat($_))[9];
 	unlink($_) if $mt < $page->modified_time;
+    }
+}
+
+sub read_pageconf {
+    if(my $obj = $self->hub->load_class('config_blocks')) {
+	my $conf = $obj->pageconf;
+	$self->fontsize($conf->{mindmap_fontsize}) if defined $conf->{mindmap_fontsize};
+	$self->fontname($conf->{mindmap_fontname}) if defined $conf->{mindmap_fontname};
     }
 }
 
@@ -82,7 +94,7 @@ sub hash2graph {
     my ($tree,$title) = @_;
     my $g = GraphViz->new(rankdir=>"LR",
 			  node => {width=>0.001,height=>0.001,fixedsize=>'true'},
-			  edge => {arrowhead=>'none',style=>"setlinewidth(2)",fontsize=>12},
+			  edge => {arrowhead=>'none',style=>"setlinewidth(2)",fontsize=> $self->fontsize,fontname=>$self->fontname },
 			 );
 
     $g->add_node('root_left',label=>'');
