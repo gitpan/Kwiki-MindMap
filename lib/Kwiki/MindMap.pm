@@ -26,7 +26,7 @@ use warnings;
 use Kwiki::Plugin '-Base';
 use YAML;
 
-our $VERSION = '0.04';
+our $VERSION = '0.06';
 
 const class_id => 'mindmap';
 const class_title => 'MindMap Blocks';
@@ -81,9 +81,19 @@ sub render_mindmap {
     my $path = $self->hub->mindmap->plugin_directory;
     my ($title,$tree) = $self->load_mindmap($reldump);
     my $file = io->catfile($path,$page,"$digest.png")->assert;
+    my $svg = io->catfile($path,$page,"$digest.svg")->assert;
     unless(-f "$file") {
 	my $grvz = $self->hash2graph($tree,$title);
-	$grvz->as_png("$file");
+	$grvz->as_png > $file;
+	$grvz->as_svg > $svg;
+    }
+    if(my $obj = $self->hub->load_class('config_blocks')) {
+	my $conf = $obj->pageconf;
+	if(defined $conf->{mindmap_as_svg}) {
+	    my $width = $conf->{mindmap_svg_width} || 800;
+	    my $height = $conf->{mindmap_svg_height} || $width;
+	    return qq{<embed src="$svg" name="$title" width="$width" height="$height" type="image/svg-xml" pluginspage="http://www.adobe.com/svg/viewer/install/">};
+	}
     }
     return qq{<img src="$file">};
 }
