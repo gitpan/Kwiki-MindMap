@@ -26,7 +26,7 @@ use warnings;
 use Kwiki::Plugin '-Base';
 use YAML;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 const class_id => 'mindmap';
 const class_title => 'MindMap Blocks';
@@ -92,23 +92,25 @@ my $hue = 0;
 
 sub hash2graph {
     my ($tree,$title) = @_;
-    my $g = GraphViz->new(rankdir=>"LR",
-			  node => {width=>0.001,height=>0.001,fixedsize=>'true'},
-			  edge => {arrowhead=>'none',style=>"setlinewidth(2)",fontsize=> $self->fontsize,fontname=>$self->fontname },
+    my $g = GraphViz->new(graph => {rankdir=>"LR", ranksep=>'0.05', nodesep=>'0.10'},
+			  node => {label=>"",width=>0.04,height=>0.04,style=>'filled',fixedsize=>'true'},
+			  edge => {arrowhead=>'none',style=>"setlinewidth(2)",
+				   tailclip=>'false',headclip=>'false',
+				   fontsize=> $self->fontsize,fontname=>$self->fontname },
 			 );
 
     $g->add_node('root_left',label=>'');
     $g->add_node('root_right',label=>'');
     $g->add_edge('root_right' => 'root_left', label => $title);
 
-    my @kids = sort { count_kids($a) <=> count_kids($b) } keys %$tree;
+    my @kids = sort { $self->count_kids($tree->{$a}) <=> $self->count_kids($tree->{$b}) } keys %$tree;
     my $hue_step = 1 / @kids;
     my (@left, @right);
     while (@kids) {
 	push @left, shift @kids;
-	push @left, pop @kids if @kids;
 	push @right, shift @kids if @kids;
 	push @right, pop @kids if @kids;
+	push @left, pop @kids if @kids;
     }
 
     foreach my $left (@left) {
@@ -188,7 +190,7 @@ sub node_level {
 
 sub draw_left_kids {
     my ($graph, $parent_symbol,$this_symbol,$tree) = @_;
-    $graph->add_node($this_symbol, label=>'');
+    $graph->add_node($this_symbol, label=>'',color=>"$hue,1,1");
     $graph->add_edge($parent_symbol => $this_symbol,
 		     color => "$hue,1,1",
 		     label => (split('/',$this_symbol))[-1],
@@ -201,7 +203,7 @@ sub draw_left_kids {
 
 sub draw_right_kids {
     my ($graph, $parent_symbol,$this_symbol,$tree) = @_;
-    $graph->add_node($this_symbol, label=>'');
+    $graph->add_node($this_symbol, label=>'',color=>"$hue,1,1");
     $graph->add_edge($this_symbol => $parent_symbol,
 		     color => "$hue,1,1",
 		     label => (split('/',$this_symbol))[-1],
@@ -220,7 +222,7 @@ sub count_kids {
   my @kids = keys %$root;
   my $count = @kids;
   foreach my $kid (@kids) {
-    $count += count_kids($kid);
+      $count += $self->count_kids($root->{$kid});
   }
 
   return $count;
