@@ -1,11 +1,8 @@
 package Kwiki::MindMap;
-
-use strict;
-use warnings;
-use Kwiki::Plugin qw(-Base);
+use Kwiki::Plugin -Base;
 use YAML;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 const class_id => 'mindmap';
 const class_title => 'MindMap Blocks';
@@ -222,8 +219,6 @@ sub count_kids {
   return $count;
 }
 
-
-1;
 __END__
 =head1 NAME
 
@@ -260,7 +255,7 @@ L<Kwiki::GDGraphGenerator>, L<Kwiki::SocialMap>
 
 =head1 COPYRIGHT
 
-Copyright 2004 by Kang-min Liu <gugod@gugod.org>.
+Copyright 2004,2005 by Kang-min Liu <gugod@gugod.org>.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
