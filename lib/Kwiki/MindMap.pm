@@ -1,36 +1,19 @@
 package Kwiki::MindMap;
 
-=head1 NAME
-
-Kwiki::MindMap - Display what's on your mind.
-
-=head1 DESCRIPTION
-
-Display what's on your mind.
-
-Thanks to dngor for providing beautiful GraphViz mindmap rendering code :)
-
-=head1 COPYRIGHT
-
-Copyright 2004 by Kang-min Liu <gugod@gugod.org>.
-
-This program is free software; you can redistribute it and/or
-modify it under the same terms as Perl itself.
-
-See <http://www.perl.com/perl/misc/Artistic.html>
-
-=cut
-
 use strict;
 use warnings;
-use Kwiki::Plugin '-Base';
+use Kwiki::Plugin qw(-Base);
 use YAML;
 
-our $VERSION = '0.06';
+our $VERSION = '0.08';
 
 const class_id => 'mindmap';
 const class_title => 'MindMap Blocks';
 const screen_template => 'site_mindmap_screen.html';
+
+field prefix => '[*+0=]';
+field fontsize => 12;
+field fontname => 'Times';
 
 sub register {
     my $registry = shift;
@@ -41,9 +24,6 @@ package Kwiki::MindMap::Wafl;
 use base 'Spoon::Formatter::WaflBlock';
 use Digest::MD5;
 use GraphViz;
-
-field fontsize => 12;
-field fontname => 'Times';
 
 sub to_html {
     $self->cleanup;
@@ -67,8 +47,8 @@ sub cleanup {
 sub read_pageconf {
     if(my $obj = $self->hub->load_class('config_blocks')) {
 	my $conf = $obj->pageconf;
-	$self->fontsize($conf->{mindmap_fontsize}) if defined $conf->{mindmap_fontsize};
-	$self->fontname($conf->{mindmap_fontname}) if defined $conf->{mindmap_fontname};
+	$self->hub->mindmap->fontsize($conf->{mindmap_fontsize}) if defined $conf->{mindmap_fontsize};
+	$self->hub->mindmap->fontname($conf->{mindmap_fontname}) if defined $conf->{mindmap_fontname};
     }
 }
 
@@ -76,6 +56,8 @@ sub read_pageconf {
 # on every page rendering. That's totally a waste of time.
 sub render_mindmap {
     my $reldump = shift;
+    $reldump =~ s/^\s+$//gm;
+    $reldump =~ s/\n\n+/\n/gs;
     my $page = $self->hub->pages->current->id;
     my $digest = Digest::MD5::md5_hex($reldump);
     my $path = $self->hub->mindmap->plugin_directory;
@@ -106,7 +88,7 @@ sub hash2graph {
 			  node => {label=>"",width=>0.04,height=>0.04,style=>'filled',fixedsize=>'true'},
 			  edge => {arrowhead=>'none',style=>"setlinewidth(2)",
 				   tailclip=>'false',headclip=>'false',
-				   fontsize=> $self->fontsize,fontname=>$self->fontname },
+				   fontsize=> $self->hub->mindmap->fontsize,fontname=>$self->hub->mindmap->fontname },
 			 );
 
     $g->add_node('root_left',label=>'');
@@ -153,8 +135,9 @@ sub load_mindmap_subtree {
     my $tree = {};
     my @scope = $self->subtree_scopes(@lines);
     my $i = 0;
+    my $prefix = $self->hub->mindmap->prefix;
     while($i < @scope) {
-	my $node = $lines[$i]; $node =~ s/^=+\s*//;
+	my $node = $lines[$i]; $node =~ s/^($prefix)+\s*//;
 	$tree->{$node} = $self->load_mindmap_subtree(@lines[$i+1..$scope[$i]]);
 	$i = $scope[$i] + 1;
     }
@@ -191,7 +174,8 @@ sub all_node_level {
 
 sub node_level {
     my $line = shift;
-    if ($line =~ /^(=+)/) {
+    my $prefix = $self->hub->mindmap->prefix;
+    if ($line =~ /^(($prefix)+)/) {
 	return length($1);
     } else {
 	return -1;
@@ -240,3 +224,49 @@ sub count_kids {
 
 
 1;
+__END__
+=head1 NAME
+
+Kwiki::MindMap - Display what's on your mind.
+
+=head1 DESCRIPTION
+
+Display what's on your mind.
+
+Thanks to dngor for providing beautiful GraphViz mindmap rendering code :)
+
+Here's a quick example how to use this plugin after you installed it:
+
+    .mindmap
+    computer
+    * laptop
+    ** huge
+    *** IBM
+    *** Mac
+    ** small
+    *** sony
+    *** toshiba
+    * desktop
+    ** pretty
+    ** ugly
+    .mindmap
+
+The string 'computer' means the root node, and sub-nodes are prefixed
+with '*', you may use any of [*+0=] for the tree prefix.
+
+=head1 SEE ALSO
+
+L<Kwiki::GDGraphGenerator>, L<Kwiki::SocialMap>
+
+=head1 COPYRIGHT
+
+Copyright 2004 by Kang-min Liu <gugod@gugod.org>.
+
+This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+See <http://www.perl.com/perl/misc/Artistic.html>
+
+=cut
+
+

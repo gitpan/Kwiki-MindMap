@@ -1,5 +1,5 @@
 name: Kwiki-MindMap
-version: 0.06
+version: 0.08
 abstract: A Kwiki plugin that displays what's on your mind
 author: Kang-min Liu (gugod@gugod.org)
 license: perl
@@ -9,4 +9,4 @@ requires:
 no_index:
   directory:
     - inc
-generated_by: Module::Install version 0.33
+generated_by: Module::Install version 0.35
