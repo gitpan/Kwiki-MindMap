@@ -8,6 +8,8 @@ Kwiki::MindMap - Display what's on your mind.
 
 Display what's on your mind.
 
+Thanks to dngor for providing beautiful GraphViz mindmap rendering code :)
+
 =head1 COPYRIGHT
 
 Copyright 2004 by Kang-min Liu <gugod@gugod.org>.
@@ -24,7 +26,7 @@ use warnings;
 use Kwiki::Plugin '-Base';
 use YAML;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 const class_id => 'mindmap';
 const class_title => 'MindMap Blocks';
@@ -38,7 +40,7 @@ sub register {
 package Kwiki::MindMap::Wafl;
 use base 'Spoon::Formatter::WaflBlock';
 use Digest::MD5;
-use GraphViz::Data::Grapher;
+use GraphViz;
 
 sub to_html {
     $self->cleanup;
@@ -68,35 +70,48 @@ sub render_mindmap {
     my ($title,$tree) = $self->load_mindmap($reldump);
     my $file = io->catfile($path,$page,"$digest.png")->assert;
     unless(-f "$file") {
-        $file->lock;
 	my $grvz = $self->hash2graph($tree,$title);
-	$grvz->as_png() > $file;
-	$file->unlock;
+	$grvz->as_png("$file");
     }
     return qq{<img src="$file">};
 }
 
+my $hue = 0;
 
 sub hash2graph {
     my ($tree,$title) = @_;
-    my $g = GraphViz->new(layout => 'neato');
-    $self->hash2graph_recur($tree,$g,$title);
+    my $g = GraphViz->new(rankdir=>"LR",
+			  node => {width=>0.001,height=>0.001,fixedsize=>'true'},
+			  edge => {arrowhead=>'none',style=>"setlinewidth(2)",fontsize=>12},
+			 );
+
+    $g->add_node('root_left',label=>'');
+    $g->add_node('root_right',label=>'');
+    $g->add_edge('root_right' => 'root_left', label => $title);
+
+    my @kids = sort { count_kids($a) <=> count_kids($b) } keys %$tree;
+    my $hue_step = 1 / @kids;
+    my (@left, @right);
+    while (@kids) {
+	push @left, shift @kids;
+	push @left, pop @kids if @kids;
+	push @right, shift @kids if @kids;
+	push @right, pop @kids if @kids;
+    }
+
+    foreach my $left (@left) {
+	$self->draw_left_kids($g,"root_left","root_left/$left",$tree->{$left});
+	$hue += $hue_step;
+    }
+
+    foreach my $right (@right) {
+	$self->draw_right_kids($g,"root_right","root_right/$right",$tree->{$right});
+	$hue += $hue_step;
+    }
+
+    $hue = 0;
     return $g;
 }
-
-sub hash2graph_recur {
-    my ($tree,$graph,$parent) = @_;
-    return unless(ref($tree) eq 'HASH');
-    for my $node (keys %$tree) {
-	$graph->add_node("$parent/$node",
-			 label => "$node",
-			 shape => 'plaintext',
-			 weight => 0, height => 0);
-	$graph->add_edge("$parent","$parent/$node");
-	$self->hash2graph_recur($tree->{$node},$graph,"$parent/$node");
-    }
-}
-
 
 sub load_mindmap {
     my $dump = shift;
@@ -109,7 +124,7 @@ sub load_mindmap {
 sub load_mindmap_subtree {
     my @lines = @_;
 
-    return '' unless(defined(@lines[0]));
+    return '' unless(defined($lines[0]));
 
     my $tree = {};
     my @scope = $self->subtree_scopes(@lines);
@@ -129,7 +144,7 @@ sub subtree_scopes {
 
     # O(n^2). Could be better.
     for my $i (0..$#lines) {
-	@scope[$i] = $i;
+	$scope[$i] = $i;
 	for my $j ($i+1..$#lines) {
 	    if($levels[$j] > $levels[$i]) {
 		$scope[$i] = $j
@@ -157,6 +172,46 @@ sub node_level {
     } else {
 	return -1;
     }
+}
+
+sub draw_left_kids {
+    my ($graph, $parent_symbol,$this_symbol,$tree) = @_;
+    $graph->add_node($this_symbol, label=>'');
+    $graph->add_edge($parent_symbol => $this_symbol,
+		     color => "$hue,1,1",
+		     label => (split('/',$this_symbol))[-1],
+		    );
+    return unless (ref($tree) eq 'HASH');
+    foreach my $kid (keys %$tree) {
+	$self->draw_left_kids($graph,$this_symbol, "$this_symbol/$kid", $tree->{$kid});
+    }
+}
+
+sub draw_right_kids {
+    my ($graph, $parent_symbol,$this_symbol,$tree) = @_;
+    $graph->add_node($this_symbol, label=>'');
+    $graph->add_edge($this_symbol => $parent_symbol,
+		     color => "$hue,1,1",
+		     label => (split('/',$this_symbol))[-1],
+		    );
+    return unless (ref($tree) eq 'HASH');
+    foreach my $kid (keys %$tree) {
+	$self->draw_right_kids($graph,$this_symbol, "$this_symbol/$kid", $tree->{$kid});
+    }
+}
+
+
+sub count_kids {
+  my $root = shift;
+  return 0 unless ref($root) eq 'HASH';
+
+  my @kids = keys %$root;
+  my $count = @kids;
+  foreach my $kid (@kids) {
+    $count += count_kids($kid);
+  }
+
+  return $count;
 }
 
 
